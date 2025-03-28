@@ -13,12 +13,16 @@ class User(db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     telegram_id = db.Column(db.String(50), unique=True, nullable=False)
-    username = db.Column(db.String(80), nullable=False)
+    username = db.Column(db.String(80), nullable=True)
     habit_1 = db.Column(db.String(300), nullable=True)
     habit_2 = db.Column(db.String(300), nullable=True)
     habit_3 = db.Column(db.String(300), nullable=True)
     date_created_1 = db.Column(db.Date, default=func.now())
     date_done_1 = db.Column(db.Date, default=func.now())
+    date_created_2 = db.Column(db.Date, default=func.now())
+    date_done_2 = db.Column(db.Date, default=func.now())
+    date_created_3 = db.Column(db.Date, default=func.now())
+    date_done_3 = db.Column(db.Date, default=func.now())
 
 
 if __name__ == "__main__":
