@@ -173,5 +173,46 @@ def mark_habit_done(call):
 
     bot.answer_callback_query(call.id)
 
+
+@bot.message_handler(commands=['delete'])
+def delete_habit(message):
+    telegram_id = message.chat.id
+    with app.app_context():
+        user = User.query.filter_by(telegram_id=telegram_id).first()
+
+    if user:
+        habits = {
+            'habit_1' : user.habit_1,
+            'habit_2' : user.habit_2,
+            'habit_3' : user.habit_3
+        }
+        habits = {key : value for key, value in habits.items() if value}
+
+        if habits:
+            markup = telebot.types.InlineKeyboardMarkup()
+            for field, habit in habits.items():
+                markup.add(telebot.types.InlineKeyboardButton(text=habit, callback_data=f'delete_{field}'))
+
+            bot.send_message(telegram_id, 'Choose a habit, you want to delete', reply_markup=markup)
+        else:
+            bot.send_message(telegram_id, 'You have no habits')
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('delete_'))
+def delete_habit_done(call):
+    telegram_id = call.message.chat.id
+    habit_field = call.data.split('_')[1]
+    with app.app_context():
+        user = User.query.filter_by(telegram_id=telegram_id).first()
+        if user:
+            setattr(user, habit_field, None)
+            setattr(user, habit_field.replace('habit', 'date_create'), None)
+            setattr(user, habit_field.replace('habit', 'date_done'), None)
+            db.session.commit()
+            bot.answer_callback_query(call.id)
+            bot.send_message(telegram_id, 'Your habit has been deleted')
+        else:
+            bot.answer_callback_query(call.id)
+            bot.send_message(telegram_id, 'There is no such user')
+
 if __name__ == '__main__':
     bot.polling()
