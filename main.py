@@ -5,13 +5,11 @@ from datetime import datetime, date
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from database_setup import User, db, app
-
-
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ForceReply
 
 load_dotenv('.env')
 TOKEN = os.environ.get('TOKEN')
 bot = telebot.TeleBot(TOKEN)
-
 
 
 @bot.message_handler(commands=['help'])
@@ -34,22 +32,24 @@ def start(message):
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    keyboard = telebot.types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
-    button_1 = telebot.types.KeyboardButton('/add')
-    button_2 = telebot.types.KeyboardButton('/list')
+    keyboard = ReplyKeyboardMarkup(row_width=2, resize_keyboard=True)
+    button_1 = KeyboardButton('/add')
+    button_2 = KeyboardButton('/list')
     keyboard.add(button_1, button_2)
 
-    button_3 = telebot.types.KeyboardButton('/done')
-    button_4 = telebot.types.KeyboardButton('/delete')
+    button_3 = KeyboardButton('/done')
+    button_4 = KeyboardButton('/delete')
     keyboard.add(button_3, button_4)
 
-    button_5 = telebot.types.KeyboardButton('/stat')
-    button_6 = telebot.types.KeyboardButton('/edit')
+    button_5 = KeyboardButton('/stat')
+    button_6 = KeyboardButton('/edit')
     keyboard.add(button_5, button_6)
 
     bot.send_message(message.chat.id, 'Choose an action:', reply_markup=keyboard)
 
+
 user_data = {}
+
 
 @bot.message_handler(commands=['add'])
 def add(message):
@@ -141,9 +141,9 @@ def done(message):
         habits = [existing_user.habit_1, existing_user.habit_2, existing_user.habit_3]
         habits = [habit for habit in habits if habit]
 
-        markup = telebot.types.InlineKeyboardMarkup()
+        markup = InlineKeyboardMarkup()
         for habit in habits:
-            markup.add(telebot.types.InlineKeyboardButton(text=habit, callback_data=f'done_{habit}'))
+            markup.add(InlineKeyboardButton(text=habit, callback_data=f'done_{habit}'))
         if markup.keyboard:
             bot.send_message(telegram_id, 'Choose a habit, you have done', reply_markup=markup)
         else:
@@ -182,30 +182,31 @@ def delete_habit(message):
 
     if user:
         habits = {
-            'habit_1' : user.habit_1,
-            'habit_2' : user.habit_2,
-            'habit_3' : user.habit_3
+            'habit_1': user.habit_1,
+            'habit_2': user.habit_2,
+            'habit_3': user.habit_3
         }
-        habits = {key : value for key, value in habits.items() if value}
+        habits = {key: value for key, value in habits.items() if value}
 
         if habits:
-            markup = telebot.types.InlineKeyboardMarkup()
+            markup = InlineKeyboardMarkup()
             for field, habit in habits.items():
-                markup.add(telebot.types.InlineKeyboardButton(text=habit, callback_data=f'delete_{field}'))
+                markup.add(InlineKeyboardButton(text=habit, callback_data=f'delete_{field}'))
 
             bot.send_message(telegram_id, 'Choose a habit, you want to delete', reply_markup=markup)
         else:
             bot.send_message(telegram_id, 'You have no habits')
 
+
 @bot.callback_query_handler(func=lambda call: call.data.startswith('delete_'))
 def delete_habit_done(call):
     telegram_id = call.message.chat.id
-    habit_field = call.data.split('_')[1]
+    habit_field = call.data[7:]
     with app.app_context():
         user = User.query.filter_by(telegram_id=telegram_id).first()
         if user:
             setattr(user, habit_field, None)
-            setattr(user, habit_field.replace('habit', 'date_create'), None)
+            setattr(user, habit_field.replace('habit', 'date_created'), None)
             setattr(user, habit_field.replace('habit', 'date_done'), None)
             db.session.commit()
             bot.answer_callback_query(call.id)
@@ -213,6 +214,42 @@ def delete_habit_done(call):
         else:
             bot.answer_callback_query(call.id)
             bot.send_message(telegram_id, 'There is no such user')
+
+
+@bot.message_handler(commands=['edit'])
+def edit_habit(message):
+    telegram_id = message.chat.id
+
+    with app.app_context():
+        user = User.query.filter_by(telegram_id=telegram_id).first()
+
+    if user:
+        empty_fields = [field for field in ['habit_1', 'habit_2', 'habit_3'] if not getattr(user, field)]
+
+        if empty_fields:
+            bot.send_message(telegram_id, "Enter new habit", reply_markup=ForceReply())
+            bot.register_next_step_handler(message, save_new_habit, user, empty_fields[0])
+        else:
+            bot.send_message(telegram_id,
+                             "You have already 3 habits. If you want to change your habit, delete the previous one, using /delete ")
+    else:
+        bot.send_message(telegram_id, "You haven't been registered yet. Press /add for registration")
+
+
+def save_new_habit(message, user, field):
+    new_habit = message.text.strip()
+
+    with app.app_context():
+        user = User.query.filter_by(telegram_id=user.telegram_id).first()
+
+        if user:
+            setattr(user, field, new_habit)
+            setattr(user, field.replace('habit', 'date_created'), date.today())
+            db.session.commit()
+            bot.send_message(user.telegram_id, f'Habit {new_habit}  has been saved')
+        else:
+            bot.send_message(user.telegram_id, "Error. User haven't been found")
+
 
 if __name__ == '__main__':
     bot.polling()
