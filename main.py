@@ -1,9 +1,7 @@
 import telebot
 import os
 from dotenv import load_dotenv
-from datetime import datetime, date
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+from datetime import date
 from database_setup import User, db, app
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, ForceReply
 
@@ -116,11 +114,11 @@ def save_to_db(telegram_id):
             habit_2=user_info.get('habit_2'),
             habit_3=user_info.get('habit_3'),
             date_created_1=date.today(),
-            date_done_1=date.today(),
+            date_done_1=None,
             date_created_2=date.today(),
-            date_done_2=date.today(),
+            date_done_2=None,
             date_created_3=date.today(),
-            date_done_3=date.today()
+            date_done_3=None
         )
 
         with app.app_context():
@@ -231,7 +229,8 @@ def edit_habit(message):
             bot.register_next_step_handler(message, save_new_habit, user, empty_fields[0])
         else:
             bot.send_message(telegram_id,
-                             "You have already 3 habits. If you want to change your habit, delete the previous one, using /delete ")
+                             "You have already 3 habits. If you want to change your habit, delete the previous one, "
+                             "using /delete ")
     else:
         bot.send_message(telegram_id, "You haven't been registered yet. Press /add for registration")
 
@@ -248,7 +247,35 @@ def save_new_habit(message, user, field):
             db.session.commit()
             bot.send_message(user.telegram_id, f'Habit {new_habit}  has been saved')
         else:
-            bot.send_message(user.telegram_id, "Error. User haven't been found")
+            bot.send_message(user.telegram_id, "Error. User hasn't been found")
+
+@bot.message_handler(commands=['stat'])
+def stat_of_habits(message):
+    telegram_id = message.chat.id
+
+    with app.app_context():
+        user = User.query.filter_by(telegram_id=telegram_id).first()
+
+    if user:
+        habit_info = []
+        for i in range(1, 4):
+            habit = getattr(user, f'habit_{i}')
+            date_created = getattr(user, f'date_created_{i}')
+            date_done = getattr(user, f'date_done_{i}')
+
+            if habit:
+                habit_info.append(
+                    f"*{habit}*\n"
+                    f"Start date: {date_created}\n"
+                    f"Finish date: {date_done or 'Has not done yet' }"
+                )
+        if habit_info:
+            bot.send_message(telegram_id, '\n\n'.join(habit_info), parse_mode='Markdown')
+        else:
+            bot.send_message(telegram_id, 'There is no habits')
+
+    else:
+        bot.send_message(telegram_id, 'Error. There is no such user')
 
 
 if __name__ == '__main__':

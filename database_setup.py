@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.sql import func
-from datetime import date
+
 
 
 app = Flask(__name__)
@@ -18,11 +18,11 @@ class User(db.Model):
     habit_2 = db.Column(db.String(300), nullable=True)
     habit_3 = db.Column(db.String(300), nullable=True)
     date_created_1 = db.Column(db.Date, nullable=True,  default=func.now())
-    date_done_1 = db.Column(db.Date, nullable=True, default=func.now())
+    date_done_1 = db.Column(db.Date, nullable=True)
     date_created_2 = db.Column(db.Date, nullable=True, default=func.now())
-    date_done_2 = db.Column(db.Date, nullable=True, default=func.now())
+    date_done_2 = db.Column(db.Date, nullable=True)
     date_created_3 = db.Column(db.Date, nullable=True, default=func.now())
-    date_done_3 = db.Column(db.Date, nullable=True, default=func.now())
+    date_done_3 = db.Column(db.Date, nullable=True)
 
 
 if __name__ == "__main__":
